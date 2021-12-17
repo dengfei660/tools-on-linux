@@ -35,7 +35,7 @@ enum ErrorCode {
     ERROR_INVALID_OPERATION   = -ENOSYS,
     ERROR_BAD_VALUE           = -EINVAL,
     ERROR_BAD_TYPE            = (ERROR_UNKNOWN + 1),
-    ERROR_NAME_NOT_FOUND      = -ENOENT,
+    ERROR_NOT_FOUND           = -ENOENT,
     ERROR_PERMISSION_DENIED   = -EPERM,
     ERROR_NO_INIT             = -ENODEV,
     ERROR_ALREADY_EXISTS      = -EEXIST,
@@ -44,19 +44,20 @@ enum ErrorCode {
 #if !defined(_WIN32)
     ERROR_BAD_INDEX           = -EOVERFLOW,
     ERROR_NOT_ENOUGH_DATA     = -ENODATA,
-    ERROR_WOULD_BLOCK         = -EWOULDBLOCK, 
+    ERROR_WOULD_BLOCK         = -EWOULDBLOCK,
     ERROR_TIMED_OUT           = -ETIMEDOUT,
     ERROR_UNKNOWN_TRANSACTION = -EBADMSG,
-#else    
+#else
     ERROR_BAD_INDEX           = -E2BIG,
     ERROR_NOT_ENOUGH_DATA     = (ERROR_UNKNOWN + 3),
     ERROR_WOULD_BLOCK         = (ERROR_UNKNOWN + 4),
     ERROR_TIMED_OUT           = (ERROR_UNKNOWN + 5),
     ERROR_UNKNOWN_TRANSACTION = (ERROR_UNKNOWN + 6),
-#endif    
+#endif
     ERROR_FDS_NOT_ALLOWED     = (ERROR_UNKNOWN + 7),
     ERROR_UNEXPECTED_NULL     = (ERROR_UNKNOWN + 8),
     ERROR_OPEN_DISPLAY_FAIL   = (ERROR_UNKNOWN + 9),
+    ERROR_PARAM_NULL          = (ERROR_UNKNOWN + 10),
 };
 
 #ifdef  __cplusplus

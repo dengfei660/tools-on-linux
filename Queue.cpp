@@ -7,7 +7,7 @@ namespace Tls {
 
 Queue::Queue()
 {
-    init_internal();
+    int32_t ret = init_internal();
 }
 
 Queue::Queue(uint32_t maxElement)
@@ -164,8 +164,12 @@ int32_t Queue::setAllowedNewData(bool allowed)
 
     if(mAllowedNewData == false) {
 		// notify waiting threads, when new data isn't accepted
-		pthread_cond_broadcast(mCondGet);
-		pthread_cond_broadcast(mCondPut);
+		if (mCondGet) {
+		    pthread_cond_broadcast(mCondGet);
+        }
+        if (mCondPut) {
+		    pthread_cond_broadcast(mCondPut);
+        }
 	}
 
 	return Q_OK;
@@ -296,8 +300,9 @@ int32_t Queue::put_internal(void *ele, int (*action)(pthread_cond_t *, pthread_m
 		if(action == NULL) {
 			return Q_ERR_NUM_ELEMENTS;
 		} else {
-			while ((mElementCnt == (INT32_MAX - 1) || (mMaxElement != 0 && mElementCnt == mMaxElement)) && mAllowedNewData)
+			while ((mElementCnt == (INT32_MAX - 1) || (mMaxElement != 0 && mElementCnt == mMaxElement)) && mAllowedNewData) {
 				action(mCondPut, mMutex);
+            }
 			if(mAllowedNewData == false) {
 				return Q_ERR_NONEWDATA;
 			}
@@ -362,10 +367,12 @@ int32_t Queue::get_internal(void **e, int (*action)(pthread_cond_t *, pthread_mu
 			*e = NULL;
 			return Q_ERR_NUM_ELEMENTS;
 		} else {
-			while(mElementCnt == 0 && mAllowedNewData)
+			while(mElementCnt == 0 && mAllowedNewData){
 				action(mCondGet, mMutex);
-			if (mElementCnt == 0 && mAllowedNewData == false)
+            }
+			if (mElementCnt == 0 && mAllowedNewData == false) {
 				return Q_ERR_NONEWDATA;
+             }
 		}
 	}
 	
@@ -375,7 +382,6 @@ int32_t Queue::get_internal(void **e, int (*action)(pthread_cond_t *, pthread_mu
 		el_prev = el;
 		el = el->next;
 	}
-	
 	if(el != NULL && el_prev == NULL) {
 		// first element is removed
 		mFirstElement = el->next;
@@ -395,7 +401,7 @@ int32_t Queue::get_internal(void **e, int (*action)(pthread_cond_t *, pthread_mu
 		*e = NULL;
 		return Q_ERR_INVALID_ELEMENT;
 	}
-	
+
 	// notify only one waiting thread
 	pthread_cond_signal(mCondPut);
 

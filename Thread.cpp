@@ -18,7 +18,7 @@ int createThread(thread_work_func entryFunction,
     pthread_attr_destroy(&attr);
     if (result != 0) {
         /*ALOGE("androidCreateRawThreadEtc failed (entry=%p, res=%d, %s)\n",
-			  entryFunction, result, strerror(errno));*/
+          entryFunction, result, strerror(errno));*/
         return 0;
     }
 
@@ -40,7 +40,7 @@ Thread::Thread()
     :mThread(pthread_t(-1)),
     mLock("Thread::mLock"),
     mStatus(NO_ERROR),
-    mExitPending(false), 
+    mExitPending(false),
     mRunning(false),
     mPaused(false)
 {

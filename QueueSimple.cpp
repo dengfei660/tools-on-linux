@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
 
 #include <Queue.h>
+#include "Thread.h"
 
 using namespace Tls;
 
@@ -138,10 +141,82 @@ void sorted2_mode() {
     delete q;
 }
 
+class ProduceThread:public Thread {
+  public:
+    ProduceThread(Queue *q) {
+        printf("ProduceThread new\n");
+        cnt = 0;
+        mQueue = q;
+    };
+    virtual ~ProduceThread(){
+        printf("ProduceThread del\n");
+    };
+    void readyToRun(){
+        
+    };
+    virtual bool threadLoop(){
+        printf("push cnt:%d\n",cnt);
+        mQueue->push(&cnt);
+        cnt++;
+        usleep(500*1000);
+        return true;
+    };
+  private:
+    int cnt;
+	Queue *mQueue;
+};
+
+class ResumeThread:public Thread {
+  public:
+    ResumeThread(Queue *q) {
+        printf("ResumeThread new\n");
+        mQueue = q;
+    };
+    virtual ~ResumeThread(){
+        printf("ResumeThread del\n");
+    };
+    void readyToRun(){};
+    virtual bool threadLoop(){
+        int *cnt = 0;
+        int ret = mQueue->popAndWait((void **) &cnt);
+        if (ret == Q_OK)
+            printf("pop cnt:%d\n",*cnt);
+        else
+            usleep(500*1000);
+        return true;
+    };
+  private:
+    
+	Queue *mQueue;
+};
+
 int main(int argc, char *argv[]) {
-	unsorted_mode();
-	sorted_mode();
-	sorted2_mode();
+	//unsorted_mode();
+	//sorted_mode();
+	//sorted2_mode();
+
+    Queue *q = new Queue();
+    ResumeThread *resumeThread = new ResumeThread(q);
+    resumeThread->run("resumeThread");
+
+    getchar();
+
+    ProduceThread *produceThread = new ProduceThread(q);
+    produceThread->run("produceThread");
+
+    getchar();
+    q->setAllowedNewData(false);
+    getchar();
+    printf("to exit thread\n");
+    resumeThread->requestExitAndWait();
+    printf("exit resume thread\n");
+    produceThread->requestExitAndWait();
+    
+
+    delete produceThread;
+    delete resumeThread;
+    delete q;
+        
 	
 	return 0;
 }

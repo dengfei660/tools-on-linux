@@ -18,7 +18,7 @@ class Thread
     virtual ~Thread();
     // Start the thread in threadLoop() which needs to be implemented.
     virtual int run(const char *name);
-    
+
     // Good place to do one-time initializations
     virtual void readyToRun();
     // Ask this object's thread to exit. This function is asynchronous, when the
@@ -35,17 +35,17 @@ class Thread
     int join();
     // Indicates whether this thread is running or not.
     bool isRunning() const;
-	void pause() {
+    void pause() {
         mPaused = true;
-	};
-	void resume() {
-		if (!mPaused) {
-            return;
-		}
-		Tls::Mutex::Autolock _l(mLock);
-        mPaused = false;
-		mCondition.broadcast();
-	};
+    };
+    void resume() {
+      if (!mPaused) {
+              return;
+      }
+      Tls::Mutex::Autolock _l(mLock);
+          mPaused = false;
+          mCondition.broadcast();
+    };
   protected:
     // isExitPending() returns true if requestExit() has been called.
     bool isExitPending() const;
@@ -61,7 +61,7 @@ private:
     static  int _threadLoop(void* user);
     // always hold mLock when reading or writing
     pthread_t       mThread;
-	  const char *    mThreadName;
+    const char *    mThreadName;
     mutable Tls::Mutex   mLock;
     Tls::Condition       mCondition;
     int        mStatus;
