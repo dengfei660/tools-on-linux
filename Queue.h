@@ -10,14 +10,14 @@
   * returned error codes, everything except Q_OK should be < 0
   */
 typedef enum QErros {
-	Q_OK = 0,
-	Q_ERR_INVALID = -1,
-	Q_ERR_LOCK = -2,
-	Q_ERR_MEM = -3,
-	Q_ERR_NONEWDATA = -4,
-	Q_ERR_INVALID_ELEMENT = -5,
-	Q_ERR_INVALID_CB = -6,
-	Q_ERR_NUM_ELEMENTS = -7
+    Q_OK = 0,
+    Q_ERR_INVALID = -1,
+    Q_ERR_LOCK = -2,
+    Q_ERR_MEM = -3,
+    Q_ERR_NONEWDATA = -4,
+    Q_ERR_INVALID_ELEMENT = -5,
+    Q_ERR_INVALID_CB = -6,
+    Q_ERR_NUM_ELEMENTS = -7
 } QErros;
     
 
@@ -97,21 +97,26 @@ class Queue {
       * returns 0 if everything worked, < 0 if error occured
       */
     int32_t popAndWait(void **e);
+
+    /**
+     * peek the pos element 
+     */
+    int32_t peek(void **e, uint32_t pos);
     /**
      * only flush element,but not free element's data
      * returns 0 on success, other failed
      */
     int32_t flush();
     /**
-     * flush element,and call ff function to free element's data
-     * ff - the data free function
+     * flush element,and call ff function to notify element action
+     * ff - the callback function
      * returns 0 on success, other failed
      */
-    int32_t flushAndFreeData(void (*ff)(void *));
+    int32_t flushAndCallback(void (*ff)(void *));
     /**
      * get element count in queue
      */
-    uint32_t getCnt();
+    int32_t getCnt();
     /**
      * checking the queue is empty?
      */
@@ -124,79 +129,99 @@ class Queue {
      * check allowed new element flag
      */
     bool isAllowedNewData();
+    void test();
   private:
     typedef struct Element{
-	    void *data;
-	    struct Element *next;
+      void *data;
+      struct Element *next;
     } Element;
-    int32_t init_internal();
+    int32_t _init();
     /**
      * destroys a queue.
      * queue will be locked.
      *
-     * canFreeData - should element data be freed? false => No, true => Yes
-     * ff - function to release the memory, NULL => free()
+     * ff - callback function,this func will be invoked when a element been flushed
      */
-    int32_t release_internal(bool canFreeData, void (*ff)(void *));
+    int32_t _release(void (*ff)(void *));
     /**
      * locks the queue
      * returns 0 on success, else not usable
      */
-    int32_t lock_internal();
+    int32_t _lock();
     /**
      * unlocks the queue
      * returns 0 on success, else not usable
      */
-    int32_t unlock_internal();
+    int32_t _unlock();
     /**
       * flushes a queue.
       * deletes all elements in the queue.
       * queue _has_ to be locked.
       *
-      * canFreeData - should element data be freed? false => No, Otherwise => Yes
-      * ff - function to release the memory, NULL => free()
+      * ff - callback function,this func will be invoked when a element been flushed
       */
-    int32_t flush_internal(bool canFreeData, void (*ff)(void *));
+    int32_t _flushElements(void (*ff)(void *));
     /**
      * adds an element to the queue.
-     * when action is NULL the function returns with an error code.
+     * when isWait is true, the put element thread will block
+     * if the queue is full until getElement be invoked
      * queue _has_ to be locked.
      *
-     * el - the element
-     * action - specifies what should be executed if max_elements is reached.
+     * ele - the element
+     * isWait - if false,this func will return immediately
+     *          if true, this func will block when queue is reached the queue capability
+     *            until getElement be invoked
      *
      * returns < 0 => error, 0 okay
      */
-    int32_t put_internal(void *ele, int (*action)(pthread_cond_t *, pthread_mutex_t *));
+    int32_t _pushElement(void *ele, bool isWait);
     /**
-      * gets the first element in the queue.
-      * when action is NULL the function returns with an error code.
-      * queue _has_ to be locked.
+      * pop the special element from the queue.
+      * the cmp param is a compare function,this function will
+      * compare every element of the queue with cmpeEle,if equal cmp will return 0
+      * or return < 0 if the element in the queue less than cmpEle or return > 0 if
+      * the element in the queue bigger than cmpEle
+      * 
+      * queue has to be locked.
       *
       * e - element pointer
-      * action - specifies what should be executed if there are no elements in the queue
+      * isWait - check if block when there are no elements in the queue
       * cmp - comparator function, NULL will create an error
-      * cmpel - element with which should be compared
+      * cmpEle - element with which should be compared
       *
       * returns < 0 => error, 0 okay
       */
-    int32_t get_internal(void **e, int (*action)(pthread_cond_t *, pthread_mutex_t *), int (*cmp)(void *, void *), void *cmpel);
-    
-    Element *mFirstElement;
-    Element *mLastElement;
-    uint32_t mElementCnt; //the cnt of elements in queue
-    uint32_t mMaxElement; //max cnt elements of queue
+    int32_t _popElement(void **e, bool isWait, int (*cmp)(void *, void *), void *cmpEle);
+
+    int32_t _peekElement(void **e, uint32_t pos);
+
+    /**
+     * alloc a idle element to store data,if the idle list is not NULL, the element
+     * will be alloc from idle list,if idle list is NULL, a new element will be alloc
+     * from memery pool
+     */
+    Element *_allocElement();
+
+    int32_t _freeElement(Element *el);
+
+    Element *mUsedFirstElement;
+    Element *mUsedLastElement;
+    Element *mIdleElements;
+    Element *mAllElements;
+    uint32_t mUsedElementCnts; //the cnt of elements in queue
+    uint32_t mAllElementCnts; //had allocated element cnt
+    uint32_t mCapability; //the capability of the queue
 
     bool mAllowedNewData; // no new data allowed
 
     //sorted queue
     bool mSort;
     bool mAscendingOrder;
-    int (*cmp_ele)(void *, void *);
+    int (*cmpEleFun)(void *, void *);
 
-    pthread_mutex_t *mMutex;
-	pthread_cond_t *mCondGet;
-	pthread_cond_t *mCondPut;
+    pthread_mutex_t mMutex;
+    pthread_cond_t mCondGet;
+    pthread_cond_t mCondPut;
 
 };
 }
