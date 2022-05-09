@@ -10,8 +10,8 @@
 #include "Logger.h"
 
 using namespace Tls;
-#define MAX_CNT 100//(100000000)
-#define MAX_TYPE (1)
+#define MAX_CNT (1000000)
+#define MAX_TYPE (10)
 #define TAG "QueueSimple"
 
 Tls::Mutex g_mutex;
@@ -70,7 +70,7 @@ class ProduceThread:public Thread {
     void readyToExit() {
         mStopTimeNs = Tls::Times::getSystemTimeNs();
         int64_t time = (mStopTimeNs - mStartTimeNs)/MAX_CNT;
-        printf("push %d time:%lld ns\n",MAX_CNT,time);
+        printf("push %d time:%lld ns/per\n",MAX_CNT,time);
     }
     virtual bool threadLoop(){
         Test *intPtr = (Test *)malloc(sizeof(Test));
@@ -112,9 +112,6 @@ class ConsumeThread:public Thread {
         printf("ConsumeThread new\n");
         mQueue = q;
         allCnt = 0;
-        for (int i = 0; i < MAX_TYPE; i++) {
-            mStatics[i] = 1;
-        }
     };
     virtual ~ConsumeThread(){
         printf("ConsumeThread del\n");
@@ -125,18 +122,27 @@ class ConsumeThread:public Thread {
     void readyToExit() {
         mStopTimeNs = Tls::Times::getSystemTimeNs();
         int64_t time = (mStopTimeNs - mStartTimeNs)/MAX_CNT;
-        printf("pop %d time:%lld ns\n",MAX_CNT,time);
+        printf("pop %d time:%lld ns/per\n",MAX_CNT,time);
     }
     virtual bool threadLoop(){
         Test *test;
-        int ret = mQueue->popAndWait((void **) &test);
+        int ret;
+        ret = mQueue->peek((void **) &test, 0);
+        if (ret == Q_OK) {
+            if (test->value%100000 == 0) {
+                printf("peek:%d,value:%d\n",test->type,test->value);
+            }
+        } else {
+            return true;
+        }
+        ret = mQueue->pop((void **) &test);
         if (ret != Q_OK) {
             printf("pop element failed\n");
             return false;
         }
 
         if (test->value%100000 == 0) {
-            printf("pop:%d,value:%d\n",test->type,test->value,test);
+            printf("pop:%d,value:%d\n",test->type,test->value);
         }
         if (test->value >= MAX_CNT) {
             printf("ConsumeThread %d reached max cnt %d\n",test->type, test->value);
@@ -149,14 +155,12 @@ class ConsumeThread:public Thread {
     };
   private:
     int allCnt;
-    int mStatics[MAX_TYPE];
     Queue *mQueue;
     int64_t mStartTimeNs;
     int64_t mStopTimeNs;
 };
 
 int main(int argc, char *argv[]) {
-    int mStatics[MAX_TYPE];
     //unsorted_mode();
     //sorted_mode();
     //sorted2_mode();
@@ -164,12 +168,12 @@ int main(int argc, char *argv[]) {
     //Queue *q = new Queue();
     //q->test();
 #if 1
-for(int j = 0; j < 1; j++) {
+for(int j = 0; j < 100; j++) {
     Queue *q = new Queue();
     ConsumeThread *consumeThread[MAX_TYPE];
     ProduceThread *produceThread[MAX_TYPE];
+
     for (int i = 0; i < MAX_TYPE; i++) {
-        mStatics[i] = 1;
         consumeThread[i] = new ConsumeThread(q);
         consumeThread[i]->run("consumeThread");
     }

@@ -28,7 +28,6 @@
  * 9.poll->setFlushing
  * 10.delete poll
  */
-
 namespace Tls {
 class Poll {
   public:
@@ -36,37 +35,37 @@ class Poll {
     virtual ~Poll();
     /**
      * @brief add a fd to poll
-     * 
-     * @param fd 
-     * @return int 
+     *
+     * @param fd
+     * @return int
      */
     int addFd(int fd);
     /**
      * @brief remove fd from poll
-     * 
-     * @param fd 
-     * @return int 
+     *
+     * @param fd
+     * @return int
      */
     int removeFd(int fd);
     /**
      * @brief Set the Fd Readable ,poll will
      * check readable event
-     * @param fd 
-     * @param readable 
+     * @param fd
+     * @param readable
      * @return int 0 success, -1 fail
      */
     int setFdReadable(int fd, bool readable);
     /**
      * @brief Set the Fd Writable,poll will
      * check writable event
-     * @param fd 
-     * @param writable 
+     * @param fd
+     * @param writable
      * @return int 0 success, -1 fail
      */
     int setFdWritable(int fd, bool writable);
     /**
      * @brief wait fd event
-     * 
+     *
      * @param timeoutNs wait nanosecond time, -1 will wait for ever
      * otherwise wait the special nanasecond time
      * @return int active fd count
@@ -76,7 +75,7 @@ class Poll {
      * @brief Set the Flushing if poll wait had called
      * and waiting, this func will send a raise event to
      * wakeup poll wait
-     * @param flushing 
+     * @param flushing
      */
     void setFlushing(bool flushing);
     /**
@@ -108,8 +107,6 @@ class Poll {
     struct pollfd * mFds;
     int mFdsMaxCnt;
     int mFdsCnt;
-    struct pollfd * mActiveFds;
-    int mActiveFdsCnt;
     bool mControllable;
     std::atomic<int> mControlPending;
     std::atomic<int> mFlushing;

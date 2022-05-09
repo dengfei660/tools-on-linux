@@ -101,7 +101,7 @@ class Queue {
     /**
      * peek the pos element 
      */
-    int32_t peek(void **e, uint32_t pos);
+    int32_t peek(void **e, int32_t pos);
     /**
      * only flush element,but not free element's data
      * returns 0 on success, other failed
@@ -109,10 +109,10 @@ class Queue {
     int32_t flush();
     /**
      * flush element,and call ff function to notify element action
-     * ff - the callback function
+     * fcb - the callback function
      * returns 0 on success, other failed
      */
-    int32_t flushAndCallback(void (*ff)(void *));
+    int32_t flushAndCallback(void *userdata, void (*fcb)(void *userdata, void *ele));
     /**
      * get element count in queue
      */
@@ -129,7 +129,6 @@ class Queue {
      * check allowed new element flag
      */
     bool isAllowedNewData();
-    void test();
   private:
     typedef struct Element{
       void *data;
@@ -142,7 +141,7 @@ class Queue {
      *
      * ff - callback function,this func will be invoked when a element been flushed
      */
-    int32_t _release(void (*ff)(void *));
+    int32_t _release();
     /**
      * locks the queue
      * returns 0 on success, else not usable
@@ -160,7 +159,7 @@ class Queue {
       *
       * ff - callback function,this func will be invoked when a element been flushed
       */
-    int32_t _flushElements(void (*ff)(void *));
+    int32_t _flushElements(void *userdata, void (*fcb)(void *userdata, void *ele));
     /**
      * adds an element to the queue.
      * when isWait is true, the put element thread will block
@@ -193,23 +192,11 @@ class Queue {
       */
     int32_t _popElement(void **e, bool isWait, int (*cmp)(void *, void *), void *cmpEle);
 
-    int32_t _peekElement(void **e, uint32_t pos);
-
-    /**
-     * alloc a idle element to store data,if the idle list is not NULL, the element
-     * will be alloc from idle list,if idle list is NULL, a new element will be alloc
-     * from memery pool
-     */
-    Element *_allocElement();
-
-    int32_t _freeElement(Element *el);
+    int32_t _peekElement(void **e, int32_t pos);
 
     Element *mUsedFirstElement;
     Element *mUsedLastElement;
-    Element *mIdleElements;
-    Element *mAllElements;
     uint32_t mUsedElementCnts; //the cnt of elements in queue
-    uint32_t mAllElementCnts; //had allocated element cnt
     uint32_t mCapability; //the capability of the queue
 
     bool mAllowedNewData; // no new data allowed

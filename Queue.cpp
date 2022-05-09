@@ -41,24 +41,15 @@ Queue::Queue(uint32_t maxElement, bool ascendingOrder, int (*cmp)(void *, void *
 
 Queue::~Queue()
 {
-    _release(NULL);
+    _release();
 }
 
-void Queue::test()
-{
-    for (int i = 0; i < 100;i++) {
-_allocElement();
-    }
-        
-    
-    _release(NULL);
-}
 int32_t Queue::push(void *ele)
 {
     if (Q_OK != _lock())
         return Q_ERR_LOCK;
 
-    int8_t ret = _pushElement(ele, false);
+    int32_t ret = _pushElement(ele, false);
 
     if (Q_OK != _unlock())
         return Q_ERR_LOCK;
@@ -71,7 +62,7 @@ int32_t Queue::pushAndWait(void *ele)
     if (Q_OK != _lock())
         return Q_ERR_LOCK;
 
-    int8_t ret = _pushElement(ele, true);
+    int32_t ret = _pushElement(ele, true);
 
     if (Q_OK != _unlock())
         return Q_ERR_LOCK;
@@ -84,7 +75,7 @@ int32_t Queue::pop(void **e)
     if (Q_OK != _lock())
         return Q_ERR_LOCK;
     
-    int8_t ret = _popElement(e, false, NULL, NULL);
+    int32_t ret = _popElement(e, false, NULL, NULL);
 
     if (Q_OK != _unlock())
         return Q_ERR_LOCK;
@@ -99,7 +90,7 @@ int32_t Queue::popAndWait(void **e)
     if (Q_OK != _lock())
         return Q_ERR_LOCK;
     
-    int8_t ret = _popElement(e, true, NULL, NULL);
+    int32_t ret = _popElement(e, true, NULL, NULL);
 
     if (Q_OK != _unlock())
         return Q_ERR_LOCK;
@@ -107,14 +98,14 @@ int32_t Queue::popAndWait(void **e)
     return ret;
 }
 
-int32_t Queue::peek(void **e, uint32_t pos)
+int32_t Queue::peek(void **e, int32_t pos)
 {
     *e = NULL;
 
     if (Q_OK != _lock())
         return Q_ERR_LOCK;
 
-    int8_t ret = _peekElement(e, pos);
+    int32_t ret = _peekElement(e, pos);
 
     if (Q_OK != _unlock())
         return Q_ERR_LOCK;
@@ -128,18 +119,18 @@ int32_t Queue::flush()
     if (Q_OK != _lock())
         return Q_ERR_LOCK;
 
-    int8_t ret = _flushElements(NULL);
+    int32_t ret = _flushElements(NULL, NULL);
 
     if (Q_OK != _unlock())
         return Q_ERR_LOCK;
     return ret;
 }
-int32_t Queue::flushAndCallback(void (*ff)(void *))
+int32_t Queue::flushAndCallback(void *userdata, void (*fcb)(void *userdata, void *ele))
 {
     if (Q_OK != _lock())
         return Q_ERR_LOCK;
 
-    int32_t ret = _flushElements(ff);
+    int32_t ret = _flushElements(userdata, fcb);
 
     if (Q_OK != _unlock())
         return Q_ERR_LOCK;
@@ -223,10 +214,7 @@ int32_t Queue::_init()
         
     mUsedFirstElement = NULL;
     mUsedLastElement = NULL;
-    mIdleElements = NULL;
-    mAllElements = NULL;
     mUsedElementCnts = 0;
-    mAllElementCnts = 0;
     mCapability = INT32_MAX - 1;//max capability
     mAllowedNewData = true;
     mSort = false;
@@ -235,7 +223,7 @@ int32_t Queue::_init()
     return Q_OK;
 }
 
-int32_t Queue::_release(void(*ff)(void *))
+int32_t Queue::_release()
 {
     // this method will not immediately return on error,
     // it will try to release all the memory that was allocated.
@@ -244,22 +232,10 @@ int32_t Queue::_release(void(*ff)(void *))
     error = setAllowedNewData(false);
     error = _lock();
 
-    error = _flushElements(ff);
+    error = _flushElements(NULL, NULL);
 
-    // release internal element memory
-    Element *ele = NULL;
-    while(mAllElements != NULL) {
-        ele = mAllElements;
-        mAllElements = mAllElements->next;
-        //if (mAllElementCnts%1000 == 0)
-        printf("--el:%p,cnt:%d\n",ele,mAllElementCnts);
-        free(ele);
-        --mAllElementCnts;
-    }
     mUsedFirstElement = NULL;
     mUsedLastElement = NULL;
-    mIdleElements = NULL;
-    mAllElements = NULL;
 
     // destroy lock and queue etc
     error = pthread_cond_destroy(&mCondGet);
@@ -287,16 +263,16 @@ int32_t Queue::_unlock()
     return Q_OK;
 }
 
-int32_t Queue::_flushElements(void (*ff)(void *))
+int32_t Queue::_flushElements(void *userdata, void (*fcb)(void *userdata, void *ele))
 {
     Element *ele  = NULL;
     while(mUsedFirstElement != NULL) {
         ele = mUsedFirstElement;
         mUsedFirstElement = mUsedFirstElement->next;
-        if(ff != NULL) {
-            ff(ele->data);
+        if(fcb != NULL) {
+            fcb(userdata,ele->data);
         }
-        _freeElement(ele);
+        free(ele);
     }
     mUsedFirstElement = NULL;
     mUsedLastElement = NULL;
@@ -314,11 +290,11 @@ int32_t Queue::_pushElement(void *ele, bool isWait)
     
     // max_elements already reached?
     // if condition _needs_ to be in sync with while loop below!
-    if(mAllElementCnts ==  mCapability && mUsedElementCnts == mAllElementCnts) {
+    if (mUsedElementCnts ==  mCapability) {
         if (isWait == false) {
             return Q_ERR_NUM_ELEMENTS;
         } else {
-            while ((mUsedElementCnts == mAllElementCnts) && mAllowedNewData) {
+            while ((mUsedElementCnts == mCapability) && mAllowedNewData) {
                 pthread_cond_wait(&mCondPut, &mMutex);
             }
             if(mAllowedNewData == false) {
@@ -327,8 +303,7 @@ int32_t Queue::_pushElement(void *ele, bool isWait)
         }
     }
 
-    newEle = _allocElement();
-    
+    newEle = (Element *)calloc(1,sizeof(Element));
     if(newEle == NULL) { // could not allocate memory for new elements
         return Q_ERR_MEM;
     }
@@ -412,13 +387,13 @@ int32_t Queue::_popElement(void **e, bool isWait, int (*cmp)(void *, void *), vo
             mUsedLastElement = NULL;
         }
         //printf("_popElement,%p,data:%p,%p\n",ele,*e,mUsedFirstElement);
-        _freeElement(ele);
+        free(ele);
     } else if(ele != NULL && elePrev != NULL) {
         // element is in the middle,remove this node
         elePrev->next = ele->next;
         --mUsedElementCnts;
         *e = ele->data;
-        _freeElement(ele);
+        free(ele);
     } else {
         // element is invalid
         *e = NULL;
@@ -431,47 +406,22 @@ int32_t Queue::_popElement(void **e, bool isWait, int (*cmp)(void *, void *), vo
     return Q_OK;
 }
 
-int32_t Queue::_peekElement(void **e, uint32_t pos)
+int32_t Queue::_peekElement(void **e, int32_t pos)
 {
     Element *ele = mUsedFirstElement;
-    uint32_t elePos = 0;
-    while (ele && elePos < pos) {
+    int32_t elePos = 0;
+    if (mUsedElementCnts == 0) {
+        return Q_ERR_INVALID_ELEMENT;
+    }
+
+    while (ele != NULL && elePos++ < pos) {
         ele = ele->next;
     }
+
     if (ele == NULL) {
         return Q_ERR_INVALID_ELEMENT;
     }
     *e = ele->data;
-    return Q_OK;
-}
-
-Queue::Element *Queue::_allocElement()
-{
-    Element *newEle = NULL;
-
-    if (mIdleElements != NULL) {
-        newEle = mIdleElements;
-        mIdleElements = mIdleElements->next;
-        return newEle;
-    }
-    newEle = (Element *)calloc(1,sizeof(Element));
-    if (newEle == NULL) {
-        return NULL;
-    }
-
-    newEle->next = mAllElements;
-    mAllElements = newEle;
-    ++mAllElementCnts;
-    printf("++el:%p,cnt:%d\n",newEle,mAllElementCnts);
-    return newEle;
-}
-
-int32_t Queue::_freeElement(Element *el)
-{
-    el->data = NULL;
-    el->next = mIdleElements;
-    mIdleElements = el;
-    //printf("--_freeElement,el:%p,cnt:%d\n",mIdleElements, mAllElementCnts);
     return Q_OK;
 }
 
