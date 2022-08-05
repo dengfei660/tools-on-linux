@@ -21,6 +21,9 @@ class Thread
 
     // Good place to do one-time initializations
     virtual void readyToRun();
+
+    //good place to do one-time exit thread
+    virtual void readyToExit();
     // Ask this object's thread to exit. This function is asynchronous, when the
     // function returns the thread might still be running. Of course, this
     // function can be called from a different thread.
@@ -35,17 +38,7 @@ class Thread
     int join();
     // Indicates whether this thread is running or not.
     bool isRunning() const;
-    void pause() {
-        mPaused = true;
-    };
-    void resume() {
-      if (!mPaused) {
-              return;
-      }
-      Tls::Mutex::Autolock _l(mLock);
-          mPaused = false;
-          mCondition.broadcast();
-    };
+
   protected:
     // isExitPending() returns true if requestExit() has been called.
     bool isExitPending() const;
@@ -68,7 +61,6 @@ private:
     // note that all accesses of mExitPending and mRunning need to hold mLock
     volatile bool           mExitPending;
     volatile bool           mRunning;
-    volatile bool           mPaused;
 };
 }
 

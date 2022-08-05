@@ -43,8 +43,10 @@ public:
     // Wait on the condition variable.  Lock the mutex before calling.
     // Note that spurious wake-ups may happen.
     int wait(Mutex& mutex);
-    // same with relative timeout
+    // same with relative timeout , microsecond time
     int waitRelative(Mutex& mutex, int64_t reltime);
+    // same with relative timeout , us time
+    int waitRelativeUs(Mutex& mutex, int64_t reltime/*us*/);
     // Signal the condition variable, allowing one thread to continue.
     void signal();
     // Signal the condition variable, allowing one or all threads to continue.
@@ -103,6 +105,37 @@ inline int Condition::waitRelative(Mutex& mutex, int64_t reltime/*microsecnd*/) 
     int64_t reltime_sec = reltime/1000;
 
     ts.tv_nsec += static_cast<long>(reltime*1000*1000%1000000000);
+    if (reltime_sec < INT64_MAX && ts.tv_nsec >= 1000000000) {
+        ts.tv_nsec -= 1000000000;
+        ++reltime_sec;
+    }
+
+    int64_t time_sec = ts.tv_sec;
+    if (time_sec > INT64_MAX - reltime_sec) {
+        time_sec = INT64_MAX;
+    } else {
+        time_sec += reltime_sec;
+    }
+
+    ts.tv_sec = (time_sec > LONG_MAX) ? LONG_MAX : static_cast<long>(time_sec);
+
+    return -pthread_cond_timedwait(&mCond, &mutex.mMutex, &ts);
+}
+
+/**
+ * wait relative us time
+ * return 0 if wait success, non 0 if timeout or other
+ * ETIMEDOUT timeout,
+*/
+inline int Condition::waitRelativeUs(Mutex& mutex, int64_t reltime/*us*/) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+
+
+    // On 32-bit devices, tv_sec is 32-bit, but `reltime` is 64-bit.
+    int64_t reltime_sec = reltime/1000000;
+
+    ts.tv_nsec += static_cast<long>(reltime*1000%1000000000);
     if (reltime_sec < INT64_MAX && ts.tv_nsec >= 1000000000) {
         ts.tv_nsec -= 1000000000;
         ++reltime_sec;

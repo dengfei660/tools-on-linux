@@ -41,8 +41,7 @@ Thread::Thread()
     mLock("Thread::mLock"),
     mStatus(NO_ERROR),
     mExitPending(false),
-    mRunning(false),
-    mPaused(false)
+    mRunning(false)
 {
 }
 
@@ -51,6 +50,10 @@ Thread::~Thread()
 }
 
 void Thread::readyToRun()
+{
+}
+
+void Thread::readyToExit()
 {
 }
 
@@ -133,13 +136,13 @@ int Thread::_threadLoop(void* user)
                 // awoken by broadcast, but blocked on mLock until break exits scope
                 self->mCondition.broadcast();
                 break;
-            } else if (self->mPaused) { //pause thread
-                self->mCondition.wait(self->mLock);
             }
         }
     } while(self->mRunning);
 
     self->mRunning = false;
+
+    self->readyToExit();
 
     return 0;
 }
